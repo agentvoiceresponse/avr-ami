@@ -25,17 +25,26 @@ const ami = new Ami(
 );
 ami.keepConnected();
 
+ami.on("newchannel" , (event) => {
+   calls[event.linkedid] = {
+      calleridnum: event.calleridnum,
+      exten: event.exten,
+   };
+});
+
 // dialplan
 ami.on("newexten", (event) => {
+  calls[event.linkedid] = calls[event.linkedid] || {};
+
   if (event.application && event.application.toLowerCase() === "audiosocket") {
-    calls[event.linkedid] = {
+    calls[event.linkedid] = Object.assign(calls[event.linkedid], {
       uuid: extractUUID(event.appdata),
       channel: event.channel,
-    };
+      calleridnum: event.calleridnum,
+    });
   }
 
   if (event.application && event.application.toLowerCase() === "set") {
-    calls[event.linkedid] = calls[event.linkedid] || {};
     calls[event.linkedid].channel = event.channel;
 
     if (event.appdata && event.appdata.includes("UUID")) {
@@ -50,6 +59,7 @@ ami.on("newexten", (event) => {
       calls[event.linkedid][name] = value;
     }
   }
+
 });
 
 // call
