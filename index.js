@@ -33,6 +33,23 @@ ami.on("newexten", (event) => {
       channel: event.channel,
     };
   }
+
+  if (event.application && event.application.toLowerCase() === "set") {
+    calls[event.linkedid] = calls[event.linkedid] || {};
+    calls[event.linkedid].channel = event.channel;
+
+    if (event.appdata && event.appdata.includes("UUID")) {
+      const value = event.appdata.split("=")[1];
+      calls[event.linkedid].uuid = value;
+    }
+
+    if (event.appdata && event.appdata.startsWith("AVR_")) {
+      const data = event.appdata.split("=");
+      const name = data[0].replace("AVR_", "").toLowerCase(); // Normalize the variable name
+      const value = data[1];
+      calls[event.linkedid][name] = value;
+    }
+  }
 });
 
 // call
@@ -143,9 +160,48 @@ const handleOriginate = async (req, res) => {
   }
 };
 
+/**
+ * Handle variable requests
+ * This endpoint retrieves the variables of a call by its UUID.
+ * If no UUID is provided, it returns the last call.
+ * @param {Object} req - The request object
+ * @param {string} req.body.uuid - The UUID of the call to get the variable from
+ * @param {Object} res - The response object
+ * @returns {Object} The response object
+ */
+const handleVariables = async (req, res) => {
+  const { uuid } = req.body;
+
+  try {
+    console.log("Calling ami variables action by uuid:", uuid);
+
+    // If no UUID is provided, return the last call
+    if (!uuid) {
+      if (Object.keys(calls).length === 0) {
+        return res.status(400).json({ message: "No calls found." });
+      }
+      const lastCall = Object.values(calls).pop();
+      if (!lastCall) {
+        return res.status(400).json({ message: "No calls found." });
+      }
+      return res.status(200).json(lastCall);
+    }
+
+    const call = findCallByUUID(calls, uuid);
+    if (!call) {
+      return res.status(404).json({ message: `Call with UUID "${uuid}" not found.` });
+    }
+    return res.status(200).json(call);
+  } catch (error) {
+    console.log("Error calling Ami Variables Action:", error.message);
+    res.status(500).json({ message: "Error communicating with Asterisk" });
+  }
+};
+
 app.post("/hangup", handleHangup);
 app.post("/transfer", handleTransfer);
 app.post("/originate", handleOriginate);
+app.post("/variables", handleVariables);
 
 const port = process.env.PORT || 6006;
 app.listen(port, () => {
