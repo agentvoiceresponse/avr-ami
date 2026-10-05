@@ -198,12 +198,49 @@ const handleVariables = async (req, res) => {
   }
 };
 
+/**
+ * Set a channel variable on a call, e.g. for the dialplan a later transfer leads to
+ * (a Redirect keeps the channel, so the variable is still there).
+ * @param {Object} req - The request object
+ * @param {string} req.body.uuid - The UUID of the call
+ * @param {string} req.body.variable - Name: letters, digits and underscores only
+ * @param {string} req.body.value - Value: up to 64 letters, digits, spaces, "-", "_" and "."
+ * @param {Object} res - The response object
+ * @returns {Object} The response object
+ */
+const handleSetVariable = async (req, res) => {
+  const { uuid, variable, value } = req.body;
+  // Only plain values: nothing the dialplan could expand (${...}, $[...]) or split on (",", "|").
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(String(variable || "")) || !/^[\w .-]{0,64}$/.test(String(value ?? ""))) {
+    return res.status(400).json({ message: "Invalid variable name or value" });
+  }
+  try {
+    const call = findCallByUUID(calls, uuid);
+    if (!call) {
+      return res.status(404).json({ message: `Call with UUID ${uuid} not found` });
+    }
+    const action = await ami.action({
+      action: "Setvar",
+      channel: call.channel,
+      variable,
+      value: String(value ?? ""),
+    });
+    res.status(200).json({ message: `Call with UUID ${uuid}: ${variable} set with action: ${action}` });
+  } catch (error) {
+    console.log("Error calling Ami Setvar Action:", error.message);
+    res.status(500).json({ message: "Error communicating with Asterisk" });
+  }
+};
+
 app.post("/hangup", handleHangup);
 app.post("/transfer", handleTransfer);
 app.post("/originate", handleOriginate);
 app.post("/variables", handleVariables);
+app.post("/setvar", handleSetVariable);
 
 const port = process.env.PORT || 6006;
-app.listen(port, () => {
-  console.log(`Asterisk Manager Interface listening on port ${port}`);
+// HOST (e.g. 127.0.0.1) limits who can reach this unauthenticated hangup/transfer API.
+const host = process.env.HOST || "0.0.0.0";
+app.listen(port, host, () => {
+  console.log(`Asterisk Manager Interface listening on ${host}:${port}`);
 });
