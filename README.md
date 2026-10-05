@@ -35,6 +35,7 @@ AVR-AMI is a Node.js application that provides a seamless integration with Aster
 3. Configure your environment variables in `.env`:
    ```
    PORT=6006
+   HOST=127.0.0.1
    AMI_HOST=127.0.0.1
    AMI_PORT=5038
    AMI_USERNAME=avr
@@ -84,6 +85,28 @@ Initiate a new outbound call.
   "callerid": "Agent Voice Response <avr>"
 }
 ```
+
+### POST /setvar
+
+Set a channel variable on an active call, for example so the dialplan a later `/transfer`
+leads to knows something about the call (a redirect keeps the channel and its variables).
+
+**Request Body:**
+```json
+{
+  "uuid": "call-uuid",
+  "variable": "CALL_LANGUAGE",
+  "value": "nl"
+}
+```
+
+`variable` may contain letters, digits and underscores; `value` up to 64 letters, digits,
+spaces, `-`, `_` and `.` -- nothing the dialplan would expand (`${...}`, `$[...]`) or split on.
+
+## Security
+
+The API has no authentication: set `HOST=127.0.0.1` (default `0.0.0.0`) when AVR runs on the
+same host, so only local services can hang up, transfer or set variables on calls.
 
 ## How It Works
 
