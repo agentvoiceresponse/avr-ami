@@ -93,25 +93,27 @@ const handleHangup = async (req, res) => {
 };
 
 // The caller steers the AI agent that chooses the transfer destination, so a context that
-// can dial out (e.g. from-internal) would allow toll fraud by voice. When set, only these
-// contexts/extensions can be reached, and only from priority 1 (unset: no restriction).
-const listFromEnv = (name) =>
-  (process.env[name] || "").split(",").map((s) => s.trim()).filter(Boolean);
-const ALLOWED_CONTEXTS = listFromEnv("ALLOWED_CONTEXTS");
+// can dial out (e.g. from-internal) would allow toll fraud by voice. Only these contexts
+// (default: demo, the LLM connectors' default) and, if set, extensions can be reached,
+// and only from priority 1.
+const listFromEnv = (name, fallback = "") =>
+  (process.env[name] || fallback).split(",").map((s) => s.trim()).filter(Boolean);
+const ALLOWED_CONTEXTS = listFromEnv("ALLOWED_CONTEXTS", "demo");
 const ALLOWED_EXTENSIONS = listFromEnv("ALLOWED_EXTENSIONS");
-if (!ALLOWED_CONTEXTS.length && !ALLOWED_EXTENSIONS.length) {
-  console.warn("ALLOWED_CONTEXTS and ALLOWED_EXTENSIONS are not set: /transfer can reach any context and extension");
+console.log(`/transfer allowed contexts: ${ALLOWED_CONTEXTS.join(", ")}`);
+if (!ALLOWED_EXTENSIONS.length) {
+  console.warn("ALLOWED_EXTENSIONS is not set: /transfer can reach any extension in those contexts");
 }
 
 /** Returns why a transfer isn't allowed, or null if it is. */
 const transferRefusal = ({ exten, context, priority }) => {
-  if (ALLOWED_CONTEXTS.length && !ALLOWED_CONTEXTS.includes(String(context))) {
+  if (!ALLOWED_CONTEXTS.includes(String(context))) {
     return `context ${context} is not allowed (allowed: ${ALLOWED_CONTEXTS.join(", ")})`;
   }
   if (ALLOWED_EXTENSIONS.length && !ALLOWED_EXTENSIONS.includes(String(exten))) {
     return `extension ${exten} is not allowed (allowed: ${ALLOWED_EXTENSIONS.join(", ")})`;
   }
-  if ((ALLOWED_CONTEXTS.length || ALLOWED_EXTENSIONS.length) && String(priority) !== "1") {
+  if (priority !== undefined && String(priority) !== "1") {
     return `priority ${priority} is not allowed (allowed: 1)`;
   }
   return null;

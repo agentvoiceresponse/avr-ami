@@ -51,7 +51,7 @@ These endpoints are primarily used by Agent Voice Response's Large Language Mode
 ### POST /transfer
 
 Transfer an active call to a different extension.
-Only contexts and extensions in `ALLOWED_CONTEXTS` / `ALLOWED_EXTENSIONS` are accepted when they are set (see [Security](#security)); otherwise `403`.
+Only contexts in `ALLOWED_CONTEXTS` (default `demo`) and, if set, extensions in `ALLOWED_EXTENSIONS` are accepted (see [Security](#security)); otherwise `403`.
 
 **Request Body:**
 ```json
@@ -118,13 +118,14 @@ for. If `/transfer` accepts any context, a caller can talk the agent into a tran
 that dials out (e.g. `from-internal`) and to an international or premium-rate number: toll fraud
 by phone call. Restrict it:
 
-- `ALLOWED_CONTEXTS`: comma-separated contexts `/transfer` may use
-- `ALLOWED_EXTENSIONS`: comma-separated extensions `/transfer` may use
+- `ALLOWED_CONTEXTS`: comma-separated contexts `/transfer` may use (default: `demo`, the
+  default context of the AVR LLM connectors' `avr_transfer`)
+- `ALLOWED_EXTENSIONS`: comma-separated extensions `/transfer` may use (default: any extension
+  in those contexts, with a warning at startup)
 
-When either is set, priority must be `1` (so a transfer can't skip the first steps of an
-extension), and any other request is refused with `403` and a message saying what is allowed,
-which the agent can pass on to the caller. Unset, nothing is restricted and a warning is logged at
-startup.
+The priority must be `1` (so a transfer can't skip the first steps of an extension). Any other
+request is refused with `403` and a message saying what is allowed, which the agent can pass on
+to the caller. If your agents transfer to another context, add it to `ALLOWED_CONTEXTS`.
 
 Use a dedicated context that contains only the extensions callers may reach, for example:
 
