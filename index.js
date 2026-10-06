@@ -92,6 +92,36 @@ const handleHangup = async (req, res) => {
   }
 };
 
+// The caller steers the AI agent that chooses the transfer destination, so a context that
+// can dial out (e.g. from-internal) would allow toll fraud by voice. Set these to restrict
+// /transfer; "*" (the default, as before this check existed) allows any.
+const listFromEnv = (name) =>
+  (process.env[name] || "*").split(",").map((s) => s.trim()).filter(Boolean);
+const ALLOWED_CONTEXTS = listFromEnv("ALLOWED_CONTEXTS");
+const ALLOWED_EXTENSIONS = listFromEnv("ALLOWED_EXTENSIONS");
+const allows = (list, value) => list.includes("*") || list.includes(String(value));
+const RESTRICTED = !ALLOWED_CONTEXTS.includes("*") || !ALLOWED_EXTENSIONS.includes("*");
+if (!RESTRICTED) {
+  console.warn(
+    "ALLOWED_CONTEXTS and ALLOWED_EXTENSIONS are not set: /transfer can reach any context and extension (see README, Security)"
+  );
+}
+
+/** Returns why a transfer isn't allowed, or null if it is. */
+const transferRefusal = ({ exten, context, priority }) => {
+  if (!allows(ALLOWED_CONTEXTS, context)) {
+    return `context ${context} is not allowed (allowed: ${ALLOWED_CONTEXTS.join(", ")})`;
+  }
+  if (!allows(ALLOWED_EXTENSIONS, exten)) {
+    return `extension ${exten} is not allowed (allowed: ${ALLOWED_EXTENSIONS.join(", ")})`;
+  }
+  // With an allowlist, a transfer can't skip the first steps of an extension.
+  if (RESTRICTED && priority !== undefined && String(priority) !== "1") {
+    return `priority ${priority} is not allowed (allowed: 1)`;
+  }
+  return null;
+};
+
 /**
  * Transfer a call
  * @param {Object} req - The request object
@@ -104,6 +134,12 @@ const handleHangup = async (req, res) => {
  */
 const handleTransfer = async (req, res) => {
   const { uuid, exten, context, priority } = req.body;
+
+  const refusal = transferRefusal({ exten, context, priority });
+  if (refusal) {
+    console.warn(`Refused transfer for uuid ${uuid}: ${refusal}`);
+    return res.status(403).json({ message: `Transfer refused: ${refusal}` });
+  }
 
   try {
     console.log(
