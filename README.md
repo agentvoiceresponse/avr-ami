@@ -51,7 +51,7 @@ These endpoints are primarily used by Agent Voice Response's Large Language Mode
 ### POST /transfer
 
 Transfer an active call to a different extension.
-Only contexts in `ALLOWED_CONTEXTS` (default `demo`) and, if set, extensions in `ALLOWED_EXTENSIONS` are accepted (see [Security](#security)); otherwise `403`.
+If `ALLOWED_CONTEXTS` / `ALLOWED_EXTENSIONS` are set, other contexts and extensions are refused with `403` (see [Security](#security)).
 
 **Request Body:**
 ```json
@@ -118,14 +118,15 @@ for. If `/transfer` accepts any context, a caller can talk the agent into a tran
 that dials out (e.g. `from-internal`) and to an international or premium-rate number: toll fraud
 by phone call. Restrict it:
 
-- `ALLOWED_CONTEXTS`: comma-separated contexts `/transfer` may use (default: `demo`, the
-  default context of the AVR LLM connectors' `avr_transfer`)
-- `ALLOWED_EXTENSIONS`: comma-separated extensions `/transfer` may use (default: any extension
-  in those contexts, with a warning at startup)
+- `ALLOWED_CONTEXTS`: comma-separated contexts `/transfer` may use
+- `ALLOWED_EXTENSIONS`: comma-separated extensions `/transfer` may use
 
-The priority must be `1` (so a transfer can't skip the first steps of an extension). Any other
-request is refused with `403` and a message saying what is allowed, which the agent can pass on
-to the caller. If your agents transfer to another context, add it to `ALLOWED_CONTEXTS`.
+Both default to `*` (any), which is how `/transfer` worked before these settings existed, so
+upgrading changes nothing until you set them; a warning is logged at startup while both are `*`.
+Setting only one restricts only that one (e.g. `ALLOWED_CONTEXTS=demo` allows any extension in
+`demo`). With either set, the priority must be `1` (so a transfer can't skip the first steps of an
+extension). A refused request gets `403` and a message saying what is allowed, which the agent
+can pass on to the caller.
 
 Use a dedicated context that contains only the extensions callers may reach, for example:
 
