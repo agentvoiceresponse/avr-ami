@@ -36,6 +36,8 @@ AVR-AMI is a Node.js application that provides a seamless integration with Aster
    ```
    PORT=6006
    HOST=127.0.0.1
+   ALLOWED_CONTEXTS=avr-transfer
+   ALLOWED_EXTENSIONS=100,200
    AMI_HOST=127.0.0.1
    AMI_PORT=5038
    AMI_USERNAME=avr
@@ -49,6 +51,7 @@ These endpoints are primarily used by Agent Voice Response's Large Language Mode
 ### POST /transfer
 
 Transfer an active call to a different extension.
+Only contexts and extensions in `ALLOWED_CONTEXTS` / `ALLOWED_EXTENSIONS` are accepted when they are set (see [Security](#security)); otherwise `403`.
 
 **Request Body:**
 ```json
@@ -107,6 +110,35 @@ spaces, `-`, `_` and `.` -- nothing the dialplan would expand (`${...}`, `$[...]
 
 The API has no authentication: set `HOST=127.0.0.1` (default `0.0.0.0`) when AVR runs on the
 same host, so only local services can hang up, transfer or set variables on calls.
+
+### Transfer allowlist
+
+Transfer destinations usually come from an AI agent, and callers can steer what the agent asks
+for. If `/transfer` accepts any context, a caller can talk the agent into a transfer to a context
+that dials out (e.g. `from-internal`) and to an international or premium-rate number: toll fraud
+by phone call. Restrict it:
+
+- `ALLOWED_CONTEXTS`: comma-separated contexts `/transfer` may use
+- `ALLOWED_EXTENSIONS`: comma-separated extensions `/transfer` may use
+
+When either is set, priority must be `1` (so a transfer can't skip the first steps of an
+extension), and any other request is refused with `403` and a message saying what is allowed,
+which the agent can pass on to the caller. Unset, nothing is restricted and a warning is logged at
+startup.
+
+Use a dedicated context that contains only the extensions callers may reach, for example:
+
+```
+[avr-transfer]
+exten => 100,1,Dial(PJSIP/100,30)
+exten => 200,1,Dial(PJSIP/200,30)
+```
+
+with `ALLOWED_CONTEXTS=avr-transfer` and `ALLOWED_EXTENSIONS=100,200`. Then even the context alone
+can't dial out.
+
+`/originate` can place any call and is not restricted by these settings: keep the API reachable
+only by AVR's own services (`HOST=127.0.0.1` or a firewall on its port).
 
 ## How It Works
 

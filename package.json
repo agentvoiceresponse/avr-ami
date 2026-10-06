@@ -1,6 +1,6 @@
 {
     "name": "avr-ami",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "author": "Agent Voice Response",
     "description": "Webservice to transfer or terminate a call via AMI",
     "main": "index.js",
